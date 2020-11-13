@@ -1,36 +1,54 @@
-import torch
-from sklearn.metrics import accuracy_score, recall_score, f1_score, roc_auc_score
+from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
+from logger import logger
+from tensorboardX import SummaryWriter
+import numpy as np
+
+writer = SummaryWriter(comment='model')
 
 
-def classification_eval_metrics(logits, labels, num_labels):
-    predictions = logits.argmax(logits)
+def binary_eval_metrics(logits, labels, batch=-1):
+    predictions = np.argmax(logits, axis=1)
 
-    info_dict = {
-        "predictions": predictions,
-        "labels": labels,
-    }
+    if len(logits) == 0 or len(labels) == 0:
+        logger.error('empty data to evaluate')
+        return {'accuracy': 0.0, 'f1': 0.0, 'auc': 0.0}
 
-    if len(self.predictions) == 0 or len(self.labels) == 0:
-        tf.logging.info('empty data to evaluate')
-        return {'accuracy': 0.0, 'micro_f1': 0.0,
-                'macro_f1': 0.0, 'weighted_f1': 0.0}
+    accuracy = accuracy_score(labels, predictions)
+    f1 = f1_score(labels, predictions)
+    auc = roc_auc_score(labels, [l[1] for l in logits])
 
-    self.labels = np.stack(self.labels)
-    self.predictions = np.stack(self.predictions)
+    if batch >= 0:
+        writer.add_scalar('accuracy', accuracy, global_step=batch)
+        writer.add_scalar('f1', f1, global_step=batch)
+        writer.add_scalar('auc', auc, global_step=batch)
 
-    micro_f1 = f1_score(self.labels, self.predictions, labels=labels, average='micro')
-    macro_f1 = f1_score(self.labels, self.predictions, labels=labels, average='macro')
-    weighted_f1 = f1_score(self.labels, self.predictions, labels=labels, average='weighted')
-    accuracy = accuracy_score(self.labels, self.predictions)
-    return {'py_accuracy': accuracy, 'py_micro_f1': micro_f1,
-            'py_macro_f1': macro_f1, 'py_weighted_f1': weighted_f1}
+    return {'accuracy': accuracy, 'f1': f1, 'auc': auc}
 
-    label_idxs = [i for i in range(num_labels)]
-    metric_dict = evaluator.get_metric_ops(info_dict, label_idxs)
-    ret_metrics = evaluator.evaluate(label_idxs)
 
-    tf.summary.scalar("accuracy", ret_metrics['py_accuracy'])
-    tf.summary.scalar("micro_f1", ret_metrics['py_micro_f1'])
-    tf.summary.scalar("macro_f1", ret_metrics['py_macro_f1'])
-    tf.summary.scalar("weighted_f1", ret_metrics['py_weighted_f1'])
-    return metric_dict
+def multi_class_eval_metrics(logits, labels, batch=-1, average='micro'):
+    if np.ndim(labels) != 2:
+        raise ValueError('logits shape must be (n_samples, n_classes)')
+    if len(logits) == 0 or len(labels) == 0:
+        logger.info('empty data to evaluate')
+        return {'accuracy': 0, 'f1': 0, 'auc': 0}
+
+    predictions = np.argmax(logits, axis=1)
+
+    accuracy = accuracy_score(labels, predictions)
+    f1 = f1_score(labels, predictions, average=average)
+    auc = roc_auc_score(labels, logits, average=average)
+
+    if batch >= 0:
+        writer.add_scalar('accuracy', accuracy, global_step=batch)
+        writer.add_scalar('f1', f1, global_step=batch)
+        writer.add_scalar('auc', auc, global_step=batch)
+
+    return {'accuracy': accuracy, 'f1': f1, 'auc': auc}
+
+
+if __name__ == '__main__':
+    a = np.array([[0.9, 0.1], [0.8, 0.2], [0.7, 0.3], [0.2, 0.8], [0.3, 0.7]])
+    bs = [[1, 1, 1, 0, 0], [0, 1, 1, 0, 0], [0, 0, 1, 0, 0], [0, 0, 0, 1, 0], [0, 0, 0, 1, 1]]
+    for i in range(5):
+        b = bs[i]
+        print(binary_eval_metrics(a, b, batch=i))

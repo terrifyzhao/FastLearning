@@ -33,3 +33,6 @@ def setup_log(log_path, log_name):
     )
     logger.addHandler(file_handler)
     return logger
+
+
+logger = setup_log('logs', 'model')
