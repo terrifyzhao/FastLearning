@@ -1,5 +1,6 @@
 import torch
 import time
+from classification_metrics import binary_eval_metrics, multi_class_eval_metrics
 
 
 class BaseModel:
@@ -19,10 +20,10 @@ class BaseModel:
             self.device = torch.device('cpu')
             print('Training device is cpu')
 
-    def run(self, train_loader, valid_loader, model_path):
-        self.train_loader = train_loader
-        self.valid_loader = valid_loader
+        self.train_loader, self.valid_loader = self.load_data()
         self.optimizer = self.build_optimizer()
+
+    def run(self, model_path):
 
         min_valid_loss = float('inf')
 
@@ -41,8 +42,9 @@ class BaseModel:
             secs = secs % 60
 
             print('Epoch: %d' % (epoch + 1), " | time in %d minutes, %d seconds" % (mins, secs))
-            print(f'\tLoss: {train_loss:.4f}(train)\t|\tAcc: {train_acc * 100:.1f}%(train)')
-            print(f'\tLoss: {valid_loss:.4f}(valid)\t|\tAcc: {valid_acc * 100:.1f}%(valid)')
+            print(f'\tLoss: {train_loss:.4f}(train)\t|\tMetrics: {train_matrix}%(train)')
+            # print(f'\tLoss: {train_loss:.4f}(train)\t|\tMetrics: {train_matrix * 100:.1f}%(train)')
+            print(f'\tLoss: {valid_loss:.4f}(valid)\t|\tMetrics: {valid_matrix}%(valid)')
 
     def _train_func(self):
         train_loss = 0
@@ -75,6 +77,9 @@ class BaseModel:
                 valid_correct += (output.argmax(1) == y).sum().item()
 
         return valid_loss / len(self.valid_loader), valid_correct / len(self.valid_loader.dataset)
+
+    def load_data(self):
+        raise NotImplemented('must be implemented in subclass')
 
     def loss_function(self, prediction, label):
         raise NotImplemented('must be implemented in subclass')
