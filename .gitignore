@@ -131,3 +131,5 @@ dmypy.json
 .idea/
 logs/
 runs/
+
+.DS_Store
